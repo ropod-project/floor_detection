@@ -1,0 +1,22 @@
+<package>
+  <name>floor_detection</name>
+  <version>1.0.0</version>
+  <description>
+    Detects a floor using smart wheel data
+  </description>
+  <license>GPLv3</license>
+
+  <maintainer email="aleksandar.mitrevski@h-brs.de">Alex Mitrevski</maintainer>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>message_generation</build_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>ropod_ros_msgs</build_depend>
+
+  <run_depend>message_runtime</run_depend>
+  <run_depend>rospy</run_depend>
+  <run_depend>ropod_ros_msgs</run_depend>
+
+  <test_depend>roslaunch</test_depend>
+</package>

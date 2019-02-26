@@ -1,0 +1,7 @@
+<launch>
+    <node name="floor_detection" pkg="floor_detection" type="floor_detection" output="screen">
+        <param name="config_file" value="$(find floor_detection)/config/floor_detection_config.yaml" />
+        <param name="server_name" value="floor_detection_server" />
+        <param name="sw_data_topic" value="/sw_ethercat_parser/data" />
+    </node>
+</launch>
