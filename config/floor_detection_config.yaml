@@ -1,15 +1,14 @@
-floor_measurement_limits:
+reference_floor: 0
+floor_measurements:
 -
     floor_number: 0
-    min_measurement: 1025.6
-    max_measurement: 1035.0
+    mean_pressure_diff: 0.0
 -
     floor_number: 1
-    min_measurement: 1025.2
-    max_measurement: 1025.5
+    mean_pressure_diff: -0.5
 -
     floor_number: 2
-    min_measurement: 1015.2
-    max_measurement: 1025.1
+    mean_pressure_diff: -1.0
+pressure_diff_tolerance: 0.1
 redundant_measurement_count: 4
 filter_window_size: 5

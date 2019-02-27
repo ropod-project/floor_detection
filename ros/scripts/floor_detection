@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import yaml
 import rospy
+from std_msgs.msg import Int32
 from ropod_ros_msgs.msg import SmartWheelData
 
 from floor_detection.floor_detector import FloorDetector
@@ -8,28 +9,40 @@ from floor_detection.srv import DetectFloor, DetectFloorResponse
 
 class FloorDetectionNode(object):
     '''A ROS node exposing a floor detection functionality based on pressure
-    sensor measurements from (potentially multiple) smart wheels.
+    sensor measurements from (potentially multiple) smart wheels. The detector
+    uses the change in pressure measurements for detecting floor changes, so the
+    starting floor should be initialised manually for the component to work properly.
 
-    The number of redundant measurements, the window size of the detector's median filter,
-    and the expected min/max measurement ranges corresponding to different floors
-    are expected to be specified in a YAML configuration file in the following format:
+    The detector uses the following configuration parameters:
+    * a reference floor
+    * number of redundant measurements
+    * window size of the detector's median filter
+    * expected pressure differences between floors expressed with respect to the reference floor
+    * error tolerance for the pressure differences
+    The configuration parameters are specified in a YAML file that has the following format:
 
     ---------------------------------------------------------------------------
-    floor_detection_config:
+    reference_floor: int
+    floor_measurements:
     - floor_number: int
-      min_measurement: float
-      max_measurement: float
+      mean_pressure_diff: float
     - floor_number: int
-      min_measurement: float
-      max_measurement: float
+      mean_pressure_diff: float
+    pressure_diff_tolerance: float
     redundant_measurement_count: int
     filter_window_size: int
     ---------------------------------------------------------------------------
 
+    Note: The expected pressure differences need to be calibrated for a specific building and sensor.
+
     The node expects the following parameters to be made available to the ROS parameter server:
     config_file_path: str -- configuration file for the floor detector
     server_name: str -- name of the floor detection service exposed by the node
+                        (default floor_detection_server)
+    set_floor_topic: str -- name of a topic on which the floor can be set manually
+                            (default /set_floor)
     sw_data_topic: str -- name of a topic on which smart wheel data are published
+                          (default /sw_ethercat_parser/data)
 
     @author Alex Mitrevski
     @contact aleksandar.mitrevski@h-brs.de
@@ -37,29 +50,41 @@ class FloorDetectionNode(object):
     '''
     def __init__(self):
         config_file_path = rospy.get_param('~config_file', '')
-        server_name = rospy.get_param('detection_server_name', 'floor_detection_server')
-        sw_data_topic = rospy.get_param('sw_data_topic', '/sw_ethercat_parser/data')
+        server_name = rospy.get_param('~detection_server_name', 'floor_detection_server')
+        set_floor_topic = rospy.get_param('~set_floor_topic', '/set_floor')
+        sw_data_topic = rospy.get_param('~sw_data_topic', '/sw_ethercat_parser/data')
 
-        floor_measurement_ranges = {}
+        reference_floor = 0
+        floor_measurement_map = {}
+        pressure_diff_tolerance = 0.
         redundant_measurement_count = 1
         filter_window_size = 5
         with open(config_file_path, 'r') as config_file:
             config = yaml.load(config_file)
-            for floor_data in config['floor_measurement_limits']:
-                ranges = (floor_data['min_measurement'], floor_data['max_measurement'])
-                floor_measurement_ranges[floor_data['floor_number']] = ranges
+            for floor_data in config['floor_measurements']:
+                floor_measurement_map[floor_data['floor_number']] = floor_data['mean_pressure_diff']
+            reference_floor = config['reference_floor']
+            pressure_diff_tolerance = config['pressure_diff_tolerance']
             redundant_measurement_count = config['redundant_measurement_count']
             filter_window_size = config['filter_window_size']
 
-        self.floor_detector = FloorDetector(floor_measurement_ranges,
+        self.floor_detector = FloorDetector(reference_floor,
+                                            floor_measurement_map,
+                                            pressure_diff_tolerance,
                                             redundant_measurement_count,
                                             filter_window_size)
+
+        self.floor_setting_sub = rospy.Subscriber(set_floor_topic, Int32,
+                                                  self.set_floor_cb)
 
         self.sw_measurement_sub = rospy.Subscriber(sw_data_topic, SmartWheelData,
                                                    self.register_measurement_cb)
 
         self.floor_detection_server = rospy.Service(server_name, DetectFloor,
                                                     self.determine_floor_cb)
+
+    def set_floor_cb(self, floor_data):
+        self.floor_detector.set_current_floor(floor_data.data)
 
     def register_measurement_cb(self, sw_data):
         pressure_measurements = []

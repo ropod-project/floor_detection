@@ -10,26 +10,51 @@ class FloorDetector(object):
     determining the floor.
 
     Constructor keyword arguments:
-    floor_measurement_ranges: Dict[int, Tuple[float]] -- a dictionary in which the keys
-                              are floor numbers and the values are expected (min, max)
-                              floor measurement ranges
+
+    reference_floor: int -- floor with respect to which measurements pressure
+                            measurements are expressed
+    floor_measurement_map: Dict[int, float] -- a dictionary in which the keys
+                           are floor numbers and the values are average
+                           differences in pressure measurements with respect
+                           to the reference floor
+    pressure_diff_tolerance: float -- allowed deviation from the values in
+                                      floor_measurement_map
     redundant_measurement_count: int -- number of pressure measurements per time unit
     filter_window_size: int -- window size used for median filtering (default 5)
 
     @author Alex Mitrevski
     @contact aleksandar.mitrevski@h-brs.de
     '''
-    def __init__(self, floor_measurement_ranges, redundant_measurement_count, filter_window_size=5):
-        self.floor_measurement_ranges = dict(floor_measurement_ranges)
+    def __init__(self, reference_floor, floor_measurement_map, pressure_diff_tolerance,
+                 redundant_measurement_count, filter_window_size=5):
+        self.reference_floor = reference_floor
+        self.reference_floor_measurement_map = dict(floor_measurement_map)
+        self.pressure_diff_tolerance = pressure_diff_tolerance
         self.redundant_measurement_count = redundant_measurement_count
         self.filter_window_size = filter_window_size
         self.measurements = [deque() for _ in range(self.redundant_measurement_count)]
         self.filtered_measurement_averages = np.zeros(self.redundant_measurement_count)
 
+        self.floor_measurement_initialised = False
+        self.current_floor = -1
+        self.current_floor_measurement = 0.
+        self.current_floor_measurement_map = dict(self.reference_floor_measurement_map)
+
+    def set_current_floor(self, floor):
+        '''Updates the information about the current floor.
+
+        Keyword arguments:
+        floor: int
+
+        '''
+        print('[floor_detector] Setting current floor: {0}'.format(floor))
+        self.__update_floor(floor)
+
     def register_measurements(self, measurements):
         '''Stores the received measurements into a local buffer.
 
-        Keyword arguments: List[float] -- a list of pressure measurements
+        Keyword arguments:
+        measurements: List[float] -- a list of pressure measurements
 
         '''
         if len(measurements) != self.redundant_measurement_count:
@@ -46,6 +71,10 @@ class FloorDetector(object):
                 self.measurements[i].popleft()
                 self.measurements[i].append(measurement)
 
+        if self.__sufficient_measurements_received() and not self.floor_measurement_initialised:
+            self.current_floor_measurement = self.__average_measurements()
+            self.floor_measurement_initialised = True
+
     def determine_floor(self):
         '''Determines the current floor based on a set of measurements in a local
         buffer. Median filtering is used on the measurements and, if there are
@@ -55,14 +84,7 @@ class FloorDetector(object):
         Returns None if less than "self.filter_window_size" measurements have been received.
 
         '''
-        if not self.__sufficient_measurements_received():
-            print('[floor_detector] Error: Insufficient measurements received; expected {0} measurements for determining the floor'.format(self.filter_window_size))
-            return None
-
-        for i, measurements in enumerate(self.measurements):
-            self.filtered_measurement_averages[i] = np.median(measurements)
-
-        measurement_average = np.mean(self.filtered_measurement_averages)
+        measurement_average = self.__average_measurements()
         return self.__get_floor(measurement_average)
 
     def __sufficient_measurements_received(self):
@@ -75,17 +97,68 @@ class FloorDetector(object):
                 return False
         return True
 
+    def __average_measurements(self):
+        '''Returns an average of the received pressure measurements.
+        The returned average is calculated using as
+
+        \bar{measurements} = \frac{sum_{i=1}^{n}{median(self.measurements)}}{n}
+
+        where n = self.redundant_measurement_count.
+
+        Returns 0 if less than self.filter_window_size measurements have been received.
+        '''
+        if not self.__sufficient_measurements_received():
+            return 0.
+
+        for i, measurements in enumerate(self.measurements):
+            self.filtered_measurement_averages[i] = np.median(measurements)
+
+        measurement_average = np.mean(self.filtered_measurement_averages)
+        return measurement_average
+
     def __get_floor(self, measurement):
-        '''Uses the information in "self.floor_measurement_ranges" for
+        '''Uses the information in "self.current_floor_measurement_map" for
         determining the floor corresponding to the given measurement.
 
         Keyword arguments:
         measurement: float -- a filtered and averaged pressure measurement
 
         '''
-        current_floor = -1
-        for floor, ranges in self.floor_measurement_ranges.items():
-            if ranges[0] < measurement < ranges[1]:
-                current_floor = floor
+        measurement_delta = measurement - self.current_floor_measurement
+        for floor, reference_floor_delta in self.current_floor_measurement_map.items():
+            ranges = (reference_floor_delta - self.pressure_diff_tolerance,
+                      reference_floor_delta + self.pressure_diff_tolerance)
+            if ranges[0] < measurement_delta < ranges[1]:
+                if floor != self.current_floor:
+                    self.__update_floor(floor)
+                else:
+                    self.current_floor_measurement = measurement
                 break
-        return current_floor
+        return self.current_floor
+
+    def __update_floor(self, floor):
+        '''Updates the information about the current floor (including the
+        reference measurement for the current floor and the map of
+        measurement deltas).
+
+        Keyword arguments:
+        floor: int
+
+        '''
+        self.current_floor = floor
+        self.current_floor_measurement = self.__average_measurements()
+        self.current_floor_measurement_map = self.__get_updated_floor_measurement_map()
+
+    def __get_updated_floor_measurement_map(self):
+        '''Returns a map with the same keys as self.reference_floor_measurement_map,
+        such that the relative pressure differences between floors are calculated
+        with respect to the current floor rather than the reference floor.
+        '''
+        floor_measurement_map = dict(self.reference_floor_measurement_map)
+        current_floor_reference_delta = self.reference_floor_measurement_map[self.current_floor]
+        for floor, reference_floor_delta in self.reference_floor_measurement_map.items():
+            if floor == self.current_floor:
+                floor_measurement_map[floor] = 0.
+            else:
+                floor_measurement_map[floor] = reference_floor_delta - current_floor_reference_delta
+        return floor_measurement_map
