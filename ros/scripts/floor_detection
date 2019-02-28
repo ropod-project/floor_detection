@@ -92,7 +92,7 @@ class FloorDetectionNode(object):
             pressure_measurements.append(sensor_data.pressure)
         self.floor_detector.register_measurements(pressure_measurements)
 
-    def determine_floor_cb(self):
+    def determine_floor_cb(self, request):
         current_floor = self.floor_detector.determine_floor()
         response = DetectFloorResponse()
         response.floor = current_floor
