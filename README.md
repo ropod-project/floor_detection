@@ -23,7 +23,7 @@ rostopic pub /set_floor std_msgs/Int32 "data: 0"
 rosservice call /floor_detection_server "{}"
 ```
 
-For the component to work, make sure that data from the smart wheel is being published continuously.
+For the component to work, make sure that data from the smart wheels is being published continuously.
 
 ### Launch file parameters
 
