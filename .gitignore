@@ -1,1 +1,3 @@
 *.pyc
+*.nbgrader.log
+*.ipynb_checkpoints
