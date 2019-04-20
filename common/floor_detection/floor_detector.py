@@ -33,7 +33,12 @@ class FloorDetector(object):
         self.redundant_measurement_count = redundant_measurement_count
         self.filter_window_size = filter_window_size
         self.measurements = [deque() for _ in range(self.redundant_measurement_count)]
-        self.filtered_measurement_averages = np.zeros(self.redundant_measurement_count)
+
+        # a list of Booleans in which the i-th entry indicates whether
+        # the i-th pressure measurement should be taken into account
+        # for detecting floor changes (we should ideally ignore
+        # faulty measurements)
+        self.ignore_sensor_measurement = [False] * self.redundant_measurement_count
 
         self.floor_measurement_initialised = False
         self.current_floor = -1
@@ -50,6 +55,21 @@ class FloorDetector(object):
         print('[floor_detector] Setting current floor: {0}'.format(floor))
         self.__update_floor(floor)
 
+    def update_sensor_statuses(self, sensor_statuses):
+        '''Updates the list of sensor statuses with the given input.
+
+        Keyword arguments:
+        sensor_statuses: List[Bool] -- a list of Booleans with as many entries
+                                       as the number of redundant pressure sensors,
+                                       where the i-th entry indicates whether
+                                       the i-th sensor is operational
+
+        '''
+        if len(self.ignore_sensor_measurement) != len(sensor_statuses):
+            print('[floor_detector, update_sensor_statuses] WARNING: Input list expected to have {0} entries; ignoring update'.format(sensor_statuses))
+            return
+        self.ignore_sensor_measurement = sensor_statuses
+
     def register_measurements(self, measurements):
         '''Stores the received measurements into a local buffer.
 
@@ -58,7 +78,8 @@ class FloorDetector(object):
 
         '''
         if len(measurements) != self.redundant_measurement_count:
-            print('[floor_detector] Warning: Expected {0} measurements'.format(self.redundant_measurement_count))
+            print('[floor_detector, register_measurements] WARNING: Expected {0} measurements; ignoring call'.format(self.redundant_measurement_count))
+            return
 
         for i, measurement in enumerate(measurements):
             # if we haven't yet received enough measurements, we just
@@ -110,10 +131,12 @@ class FloorDetector(object):
         if not self.__sufficient_measurements_received():
             return 0.
 
+        filtered_measurement_averages = np.zeros(len(np.where(self.ignore_sensor_measurement)[0]))
         for i, measurements in enumerate(self.measurements):
-            self.filtered_measurement_averages[i] = np.median(measurements)
+            if not self.ignore_sensor_measurement[i]:
+                filtered_measurement_averages[i] = np.median(measurements)
 
-        measurement_average = np.mean(self.filtered_measurement_averages)
+        measurement_average = np.mean(filtered_measurement_averages)
         return measurement_average
 
     def __get_floor(self, measurement):
