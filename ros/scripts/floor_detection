@@ -4,7 +4,7 @@ import rospy
 from std_msgs.msg import Int32
 from ropod_ros_msgs.msg import SmartWheelData
 from pyftsm.ftsm import FTSMStates, FTSMTransitions
-from ropod.ftsm.ftsm_base import FTSMBase
+from ropod.ftsm.ftsm_base import FTSMBase, DependMonitorTypes
 
 from floor_detection.floor_detector import FloorDetector
 from floor_detection.srv import DetectFloor, DetectFloorResponse
@@ -54,8 +54,8 @@ class FloorDetectionNode(FTSMBase):
     def __init__(self):
         component_name = 'floor_detector'
         dependencies = ['smart_wheel', 'pressure']
-        dependency_monitors = {'smart_wheel': {'functional': 'ros/ros_node_monitor'},
-                               'pressure': {'functional': 'pressure/pressure_functional_monitor'}}
+        dependency_monitors = {'heartbeat': {'smart_wheel': 'ros/ros_node_monitor'},
+                               'functional': {'pressure': 'pressure/pressure_functional_monitor'}}
         super(FloorDetectionNode, self).__init__(component_name,
                                                  dependencies,
                                                  dependency_monitors)
@@ -85,33 +85,65 @@ class FloorDetectionNode(FTSMBase):
         self.floor_detection_server = None
 
     def init(self):
-        print('[floor_detection] Initialising floor detection')
+        print('[floor_detector] Initialising floor detection')
         self.floor_detector = FloorDetector(self.reference_floor,
                                             self.floor_measurement_map,
                                             self.pressure_diff_tolerance,
                                             self.redundant_measurement_count,
                                             self.filter_window_size)
 
-        print('[floor_detection] Creating a "{0}" topic subscriber'.format(self.set_floor_topic))
+        print('[floor_detector] Creating a "{0}" topic subscriber'.format(self.set_floor_topic))
         self.floor_setting_sub = rospy.Subscriber(self.set_floor_topic, Int32,
                                                   self.set_floor_cb)
 
-        print('[floor_detection] Creating a "{0}" topic subscriber'.format(self.sw_data_topic))
+        print('[floor_detector] Creating a "{0}" topic subscriber'.format(self.sw_data_topic))
         self.sw_measurement_sub = rospy.Subscriber(self.sw_data_topic, SmartWheelData,
                                                    self.register_measurement_cb)
 
-        print('[floor_detection] Advertising a "{0}" server'.format(self.server_name))
+        print('[floor_detector] Advertising a "{0}" server'.format(self.server_name))
         self.floor_detection_server = rospy.Service(self.server_name, DetectFloor,
                                                     self.determine_floor_cb)
 
-        print('[floor_detection] Initialisation completed')
+        print('[floor_detector] Initialisation completed')
         return FTSMTransitions.INITIALISED
 
     def running(self):
+        status_transition = self.process_depend_statuses()
+        if status_transition:
+            return status_transition
+
         return FTSMTransitions.CONTINUE
 
     def recovering(self):
+        sw_data_available = self.depend_statuses[DependMonitorTypes.HEARTBEAT]\
+                                                ['smart_wheel']['ros/ros_node_monitor']\
+                                                ['sw_ethercat_parser']
+        rospy.loginfo('[floor_detector] Waiting for sw_ethercat_parser to become available')
+        # TODO: propagate the failure so that the ethercat parser can be (re)started
+        while not sw_data_available:
+            sw_data_available = self.depend_statuses[DependMonitorTypes.HEARTBEAT]\
+                                                    ['smart_wheel']['ros/ros_node_monitor']\
+                                                    ['sw_ethercat_parser']
+            rospy.sleep(0.5)
         return FTSMTransitions.DONE_RECOVERING
+
+    def process_depend_statuses(self):
+        '''Returns FTSMTransitions.RECOVER if the smart wheel ethercat parser
+        is unavailable; returns None otherwise.
+        '''
+        sw_data_available = self.depend_statuses[DependMonitorTypes.HEARTBEAT]\
+                                                ['smart_wheel']['ros/ros_node_monitor']\
+                                                ['sw_ethercat_parser']
+        if not sw_data_available:
+            rospy.logwarn('[floor_detector] sw_ethercat_parser not available; trying to recover')
+            return FTSMTransitions.RECOVER
+
+        pressure_statuses = self.depend_statuses[DependMonitorTypes.FUNCTIONAL]['pressure']\
+                                                ['pressure/pressure_functional_monitor']
+        sorted_status_names = sorted([x for x in pressure_statuses.keys()
+                                      if 'pressure' in x.lower()])
+        pressure_sensor_statuses = [pressure_statuses[x] for x in sorted_status_names]
+        self.floor_detector.update_sensor_statuses(pressure_sensor_statuses)
 
     def set_floor_cb(self, floor_data):
         '''Initialises the current floor of the floor detector with the given data.
@@ -148,7 +180,7 @@ class FloorDetectionNode(FTSMBase):
             current_floor = self.floor_detector.determine_floor()
             response.floor = current_floor
         else:
-            rospy.logerr('[floor_detector] Component not in a running state; ignoring request')
+            rospy.logwarn('[floor_detector] Component not in a running state; ignoring request')
         return response
 
 if __name__ == '__main__':
