@@ -38,7 +38,7 @@ class FloorDetector(object):
         # the i-th pressure measurement should be taken into account
         # for detecting floor changes (we should ideally ignore
         # faulty measurements)
-        self.sensor_statuses = [False] * self.redundant_measurement_count
+        self.sensor_statuses = [True] * self.redundant_measurement_count
 
         self.floor_measurement_initialised = False
         self.current_floor = -1
