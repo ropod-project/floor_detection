@@ -65,8 +65,7 @@ class TestFloorDetection(unittest.TestCase):
         success = self.floor_detector.register_measurements(measurements)
         self.assertTrue(success)
         self.assertEqual(len(self.floor_detector.measurements[0]), self.filter_window_size)
-        print(self.floor_detector.measurements[0])
-        self.assertSequenceEqual([measurement[-1] for measurement in self.floor_detector.measurements[0]], measurements)
+        self.assertSequenceEqual([measurement[-1] for measurement in self.floor_detector.measurements], measurements)
 
 if __name__ == '__main__':
     unittest.main()
