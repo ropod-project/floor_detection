@@ -3,7 +3,6 @@
 import os
 import unittest
 import yaml
-import pymongo as pm
 
 from floor_detection.floor_detector import FloorDetector
 
