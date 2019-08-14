@@ -25,11 +25,11 @@ class TestFloorDetection(unittest.TestCase):
             cls.pressure_diff_tolerance = config.get('pressure_diff_tolerance', 0.0)
             cls.redundant_measurement_count = config.get('redundant_measurement_count', 1)
             cls.filter_window_size = config.get('filter_window_size', 5)
-        print(cls.reference_floor)
-        print(cls.floor_measurement_map)
-        print(cls.pressure_diff_tolerance)
-        print(cls.redundant_measurement_count)
-        print(cls.filter_window_size)
+        # print(cls.reference_floor)
+        # print(cls.floor_measurement_map)
+        # print(cls.pressure_diff_tolerance)
+        # print(cls.redundant_measurement_count)
+        # print(cls.filter_window_size)
 
     @classmethod
     def tearDownClass(cls):
@@ -66,6 +66,32 @@ class TestFloorDetection(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(len(self.floor_detector.measurements[0]), self.filter_window_size)
         self.assertSequenceEqual([measurement[-1] for measurement in self.floor_detector.measurements], measurements)
+
+    def test_determine_floor_with_all_sensor_working(self):
+        for i in range(self.filter_window_size-1):
+            measurements = [0.0 for _ in range(self.redundant_measurement_count)]
+            success = self.floor_detector.register_measurements(measurements)
+            self.assertTrue(success)
+        floor_number = self.floor_detector.determine_floor()
+        self.assertEqual(floor_number, 0)
+
+    def test_determine_floor_with_one_faulty_sensor(self):
+        faulty_sensor_index = 2
+        for i in range(self.filter_window_size-1):
+            measurements = [0.0 for _ in range(self.redundant_measurement_count)]
+            measurements[faulty_sensor_index] = -5
+            success = self.floor_detector.register_measurements(measurements)
+            self.assertTrue(success)
+        self.floor_detector.update_sensor_statuses([i != faulty_sensor_index for i in range(self.redundant_measurement_count)])
+        floor_number = self.floor_detector.determine_floor()
+        self.assertEqual(floor_number, 0)
+
+    def test_determine_floor_with_one_measurement(self):
+        measurements = [0.0 for _ in range(self.redundant_measurement_count)]
+        success = self.floor_detector.register_measurements(measurements)
+        self.assertTrue(success)
+        floor_number = self.floor_detector.determine_floor()
+        self.assertEqual(floor_number, 0)
 
 if __name__ == '__main__':
     unittest.main()
