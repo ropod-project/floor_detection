@@ -9,6 +9,6 @@ floor_measurements:
 -
     floor_number: 2
     mean_pressure_diff: -1.0
-pressure_diff_tolerance: 0.1
+pressure_diff_tolerance: 0.25
 redundant_measurement_count: 4
 filter_window_size: 5

@@ -38,7 +38,7 @@ class FloorDetector(object):
         # the i-th pressure measurement should be taken into account
         # for detecting floor changes (we should ideally ignore
         # faulty measurements)
-        self.ignore_sensor_measurement = [False] * self.redundant_measurement_count
+        self.sensor_statuses = [True] * self.redundant_measurement_count
 
         self.floor_measurement_initialised = False
         self.current_floor = -1
@@ -65,10 +65,10 @@ class FloorDetector(object):
                                        the i-th sensor is operational
 
         '''
-        if len(self.ignore_sensor_measurement) != len(sensor_statuses):
-            print('[floor_detector, update_sensor_statuses] WARNING: Input list expected to have {0} entries; ignoring update'.format(sensor_statuses))
+        if len(self.sensor_statuses) != len(sensor_statuses):
+            print('[floor_detector, update_sensor_statuses] ERROR: Input list expected to have {0} entries; ignoring update'.format(sensor_statuses))
             return
-        self.ignore_sensor_measurement = sensor_statuses
+        self.sensor_statuses = sensor_statuses
 
     def register_measurements(self, measurements):
         '''Stores the received measurements into a local buffer.
@@ -133,9 +133,9 @@ class FloorDetector(object):
         if not self.__sufficient_measurements_received():
             return 0.
 
-        filtered_measurement_averages = np.zeros(len(np.where(self.ignore_sensor_measurement)[0]))
+        filtered_measurement_averages = np.zeros(len(np.where(self.sensor_statuses)[0]))
         for i, measurements in enumerate(self.measurements):
-            if not self.ignore_sensor_measurement[i]:
+            if self.sensor_statuses[i]:
                 filtered_measurement_averages[i] = np.median(measurements)
 
         measurement_average = np.mean(filtered_measurement_averages)

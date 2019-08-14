@@ -160,9 +160,14 @@ class FloorDetectionNode(FTSMBase):
         Keyword arguments:
         sw_data: ropod_ros_msgs.msg.SmartWheelData -- smart wheel data message
         '''
+        if len(sw_data.sensors) < self.redundant_measurement_count:
+            rospy.logerr('[floor_detector] Expected {0} measurements; received {1}'.format(self.redundant_measurement_count,
+                                                                                           len(sw_data.sensors)))
+            return
+
         pressure_measurements = []
-        for sensor_data in sw_data.sensors:
-            pressure_measurements.append(sensor_data.pressure)
+        for i in range(self.redundant_measurement_count):
+            pressure_measurements.append(sw_data.sensors[i].pressure)
         self.floor_detector.register_measurements(pressure_measurements)
 
     def determine_floor_cb(self, request):
