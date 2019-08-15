@@ -1,0 +1,10 @@
+# Travis configuration taken from https://www.smartfile.com/blog/testing-python-with-travis-ci/
+language: python
+python:
+  - "3.5"
+cache: pip
+install:
+  - cat requirements.txt | xargs -n 1 -L 1 pip install
+  - python setup.py install
+script:
+  - python -m unittest discover -s 'test' -p 'test_*.py'

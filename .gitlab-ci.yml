@@ -1,0 +1,8 @@
+image: "python:3.5"
+before_script:
+    - apt-get update
+    - cat requirements.txt | xargs -n 1 -L 1 pip3 install
+    - python setup.py install
+test:
+    script:
+        - python3 -m unittest discover -s 'test' -p 'test_*.py'

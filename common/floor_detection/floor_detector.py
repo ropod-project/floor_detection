@@ -75,11 +75,12 @@ class FloorDetector(object):
 
         Keyword arguments:
         measurements: List[float] -- a list of pressure measurements
+        :returns: bool -- success
 
         '''
         if len(measurements) != self.redundant_measurement_count:
             print('[floor_detector, register_measurements] WARNING: Expected {0} measurements; ignoring call'.format(self.redundant_measurement_count))
-            return
+            return False
 
         for i, measurement in enumerate(measurements):
             # if we haven't yet received enough measurements, we just
@@ -95,6 +96,7 @@ class FloorDetector(object):
         if self.__sufficient_measurements_received() and not self.floor_measurement_initialised:
             self.current_floor_measurement = self.__average_measurements()
             self.floor_measurement_initialised = True
+        return True
 
     def determine_floor(self):
         '''Determines the current floor based on a set of measurements in a local

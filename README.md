@@ -2,9 +2,17 @@
 
 ## Summary
 
-A component (wrapped in a ROS node) detecting floor changes using pressure sensor measurements from smart wheels. The floor is determined by checking whether the measurements are within predefined measurement limits corresponding to different floors in a building.
+A component (wrapped in a ROS node) detecting floor changes using pressure sensor 
+measurements from smart wheels. The floor is determined by checking whether the 
+measurements are within predefined measurement limits corresponding to different 
+floors in a building.
 
-The node exposes a service (`floor_detection_server` by default, but the name can be changed in the component launch file). Since only changes in floor are detected rather than an absolute level, the floor needs to be initialised manually (or detected in a different manner) for the calculations to be of any meaningful value. Initialisation is done by publishing to a topic (`/set_floor` by default; the name can be changed in the launcher).
+The node exposes a service (`floor_detection_server` by default, but the name 
+can be changed in the component launch file). Since only changes in floor are 
+detected rather than an absolute level, the floor needs to be initialised manually 
+(or detected in a different manner) for the calculations to be of any meaningful 
+value. Initialisation is done by publishing to a topic (`/set_floor` by default; 
+the name can be changed in the launcher).
 
 For a more formal description of the component, please look at [this Jupyter notebook](docs/formal_description.ipynb).
 
