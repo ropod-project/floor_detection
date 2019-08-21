@@ -110,6 +110,10 @@ class FloorDetector(object):
         measurement_average = self.__average_measurements()
         return self.__get_floor(measurement_average)
 
+    def update_floor_reference_measurement(self):
+        measurement_average = self.__average_measurements()
+        self.current_floor_measurement = measurement_average
+
     def __sufficient_measurements_received(self):
         '''Returns True if all entries in "self.measurements"
         have "self.filter_window_size" measurements; returns
@@ -156,8 +160,6 @@ class FloorDetector(object):
             if ranges[0] < measurement_delta < ranges[1]:
                 if floor != self.current_floor:
                     self.__update_floor(floor)
-                else:
-                    self.current_floor_measurement = measurement
                 break
         return self.current_floor
 
