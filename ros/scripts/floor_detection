@@ -87,6 +87,7 @@ class FloorDetectionNode(FTSMBase):
         self.floor_setting_sub = None
         self.sw_measurement_sub = None
         self.floor_detection_server = None
+        self.floor_update_server = None
 
     def init(self):
         print('[floor_detector] Initialising floor detection')
@@ -95,23 +96,7 @@ class FloorDetectionNode(FTSMBase):
                                             self.pressure_diff_tolerance,
                                             self.redundant_measurement_count,
                                             self.filter_window_size)
-
-        print('[floor_detector] Creating a "{0}" topic subscriber'.format(self.set_floor_topic))
-        self.floor_setting_sub = rospy.Subscriber(self.set_floor_topic, Int32,
-                                                  self.set_floor_cb)
-
-        print('[floor_detector] Creating a "{0}" topic subscriber'.format(self.sw_data_topic))
-        self.sw_measurement_sub = rospy.Subscriber(self.sw_data_topic, SmartWheelData,
-                                                   self.register_measurement_cb)
-
-        print('[floor_detector] Advertising a "{0}" server'.format(self.get_floor_server_name))
-        self.floor_detection_server = rospy.Service(self.get_floor_server_name, DetectFloor,
-                                                    self.determine_floor_cb)
-
-        print('[floor_detector] Advertising a "{0}" server'.format(self.update_reference_measurement_server_name))
-        self.floor_detection_server = rospy.Service(self.update_reference_measurement_server_name,
-                                                    Empty, self.update_reference_measurement_cb)
-
+        self.setup_ros()
         print('[floor_detector] Initialisation completed')
         return FTSMTransitions.INITIALISED
 
@@ -119,10 +104,11 @@ class FloorDetectionNode(FTSMBase):
         status_transition = self.process_depend_statuses()
         if status_transition:
             return status_transition
-
         return FTSMTransitions.CONTINUE
 
     def recovering(self):
+        self.recover_from_possible_dead_rosmaster()
+
         sw_data_available = self.depend_statuses[DependMonitorTypes.HEARTBEAT]\
                                                 ['smart_wheel']['ros/ros_node_monitor']\
                                                 ['sw_ethercat_parser']
@@ -139,6 +125,12 @@ class FloorDetectionNode(FTSMBase):
         '''Returns FTSMTransitions.RECOVER if the smart wheel ethercat parser
         is unavailable; returns None otherwise.
         '''
+        master_available = self.depend_statuses[DependMonitorTypes.HEARTBEAT]\
+                                               ['roscore']['ros/ros_master_monitor']['status']
+        if not master_available:
+            rospy.logwarn('[floor_detector] roscore not available; trying to recover')
+            return FTSMTransitions.RECOVER
+
         sw_data_available = self.depend_statuses[DependMonitorTypes.HEARTBEAT]\
                                                 ['smart_wheel']['ros/ros_node_monitor']\
                                                 ['sw_ethercat_parser']
@@ -200,6 +192,31 @@ class FloorDetectionNode(FTSMBase):
         response = EmptyResponse()
         self.floor_detector.update_floor_reference_measurement()
         return response
+
+    def setup_ros(self):
+        print('[floor_detector] Initialising ROS node')
+        rospy.init_node('floor_detection')
+
+        print('[floor_detector] Creating a "{0}" topic subscriber'.format(self.set_floor_topic))
+        self.floor_setting_sub = rospy.Subscriber(self.set_floor_topic, Int32,
+                                                  self.set_floor_cb)
+
+        print('[floor_detector] Creating a "{0}" topic subscriber'.format(self.sw_data_topic))
+        self.sw_measurement_sub = rospy.Subscriber(self.sw_data_topic, SmartWheelData,
+                                                   self.register_measurement_cb)
+
+        print('[floor_detector] Advertising a "{0}" server'.format(self.get_floor_server_name))
+        self.floor_detection_server = rospy.Service(self.get_floor_server_name, DetectFloor,
+                                                    self.determine_floor_cb)
+
+        print('[floor_detector] Advertising a "{0}" server'.format(self.update_reference_measurement_server_name))
+        self.floor_update_server = rospy.Service(self.update_reference_measurement_server_name,
+                                                 Empty, self.update_reference_measurement_cb)
+
+    def tear_down_ros(self):
+        print('[floor_detector] Tearing down ROS node')
+        self.floor_detection_server.shutdown()
+        self.floor_update_server.shutdown()
 
 if __name__ == '__main__':
     rospy.init_node('floor_detection')
