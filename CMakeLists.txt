@@ -3,22 +3,27 @@ project(floor_detection)
 
 find_package(catkin REQUIRED COMPONENTS
     message_generation
+    actionlib
     rospy
     ropod_ros_msgs
 )
 
 catkin_python_setup()
 
-add_service_files(DIRECTORY ros/srv
+add_action_files(DIRECTORY ros/action
     FILES
-    DetectFloor.srv
+    DetectFloor.action
 )
 
-generate_messages()
+generate_messages(
+    DEPENDENCIES
+    actionlib_msgs
+)
 
 catkin_package(
   CATKIN_DEPENDS
     message_runtime
+    actionlib
     rospy
     ropod_ros_msgs
 )
