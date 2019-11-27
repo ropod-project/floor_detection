@@ -59,9 +59,12 @@ class FloorDetectionNode(FTSMBase):
         dependency_monitors = {'heartbeat': {'roscore': 'ros/ros_master_monitor',
                                              'smart_wheel': 'ros/ros_node_monitor'},
                                'functional': {'pressure': 'pressure/pressure_functional_monitor'}}
+
+        self.debug = rospy.get_param('~debug', False)
         super(FloorDetectionNode, self).__init__(component_name,
                                                  dependencies,
-                                                 dependency_monitors)
+                                                 dependency_monitors,
+                                                 debug=self.debug)
 
         self.get_floor_server_name = rospy.get_param('~detection_server_name', 'floor_detection_server')
         self.update_reference_measurement_server_name = rospy.get_param('~update_reference_measurement_server_name',
@@ -126,6 +129,9 @@ class FloorDetectionNode(FTSMBase):
         '''Returns FTSMTransitions.RECOVER if the smart wheel ethercat parser
         is unavailable; returns None otherwise.
         '''
+        if self.debug:
+            return None
+
         master_available = self.depend_statuses[DependMonitorTypes.HEARTBEAT]\
                                                ['roscore']['ros/ros_master_monitor']['status']
         if not master_available:
