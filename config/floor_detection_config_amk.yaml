@@ -1,0 +1,23 @@
+reference_floor: -1
+floor_measurements:
+-
+    floor_number: -1
+    mean_pressure_diff: 0.0
+-
+    floor_number: 0
+    mean_pressure_diff: -0.4
+-
+    floor_number: 1
+    mean_pressure_diff: -0.8
+-
+    floor_number: 2
+    mean_pressure_diff: -1.2
+-
+    floor_number: 3
+    mean_pressure_diff: -1.6
+-
+    floor_number: 4
+    mean_pressure_diff: -2.0
+pressure_diff_tolerance: 0.25
+redundant_measurement_count: 4
+filter_window_size: 5
